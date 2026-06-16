@@ -223,3 +223,48 @@ actions:
 mode: restart
 ```
 
+## 🏡 Home Assistant Dashboard
+This is the card I built in Lovelace to track my food cooking:
+
+```yaml
+type: conditional
+conditions:
+  - condition: state
+    entity: binary_sensor.anova_connection_status
+    state: "on"
+card:
+  type: vertical-stack
+  cards:
+    - square: false
+      type: grid
+      columns: 3
+      cards:
+        - type: button
+          entity: switch.anova_cooker_control
+          name: Anova
+        - type: gauge
+          entity: sensor.anova_target_temperature
+          name: Target Temp
+          severity:
+            green: 50
+            yellow: 65
+            red: 75
+        - type: gauge
+          entity: sensor.anova_current_temperature
+          name: Current Water
+          severity:
+            green: 50
+            yellow: 65
+            red: 75
+    - type: entities
+      entities:
+        - entity: input_number.anova_target_temperature
+          name: Change Target Temp
+        - type: divider
+        - entity: sensor.anova_job_stage
+          name: Cooking Phase
+          icon: mdi:progress-clock
+        - entity: sensor.anova_timer_remaining
+          name: Time Remaining
+          icon: mdi:timer-outline
+```
