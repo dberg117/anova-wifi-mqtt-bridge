@@ -171,11 +171,11 @@ Add the following automations to fix annoyances:
 
 ### Create a Home Assistant input number helper
 Under Devices & Services > Helpers click Create Helper of type Number
-Name: Anova Target Temperature
-Min: 20
-Max: 95
-Step size: 0.1
-Unit: °C
+1. Name: Anova Target Temperature
+2. Min: 20
+3. Max: 95
+4. Step size: 0.1
+5. Unit: °C
 
 ```yaml
 alias: Anova Inbound Telemetry Slider Sync
