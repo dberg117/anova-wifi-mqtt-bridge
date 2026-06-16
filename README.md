@@ -163,3 +163,61 @@ mqtt:
       state_topic: "anova/cooker/state"
       value_template: "{{ 'ON' if value_json.isMonitoringIcebath else 'OFF' }}"
 ```
+
+---
+
+## 🏡 Home Assistant Automations and Helper
+Add the following automations to fix annoyances:
+
+### Create a Home Assistant input number helper
+Under Devices & Services > Helpers click Create Helper of type Number
+Name: Anova Target Temperature
+Min: 20
+Max: 95
+Step size: 0.1
+Unit: °C
+
+```yaml
+alias: Anova Inbound Telemetry Slider Sync
+description: >-
+  Updates the slider position when targets change on the hardware, only while cooking.
+triggers:
+  - entity_id: number.anova_temperature_target
+    trigger: state
+conditions:
+  - condition: state
+    entity_id: binary_sensor.anova_cooking_status
+    state: "on"
+  - condition: template
+    value_template: >-
+      {{ states('number.anova_temperature_target') | float !=
+      states('input_number.anova_ui_slider') | float }}
+actions:
+  - target:
+      entity_id: input_number.anova_ui_slider
+    data:
+      value: "{{ states('number.anova_temperature_target') | float }}"
+    action: input_number.set_value
+mode: single
+```
+
+```yaml
+alias: Anova Outbound Slider Debounce
+description: Pushes slider values to TrueNAS only after dragging stops.
+triggers:
+  - entity_id: input_number.anova_target_temperature
+    trigger: state
+conditions:
+  - condition: template
+    value_template: >-
+      {{ states('input_number.anova_target_temperature') | float !=
+      states('number.anova_temperature_target') | float }}
+actions:
+  - delay: "00:00:02"
+  - action: mqtt.publish
+    data:
+      topic: anova/cooker/set
+      payload: "{{ states('input_number.anova_target_temperature') }}"
+mode: restart
+```
+
