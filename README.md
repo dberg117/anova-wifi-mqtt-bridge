@@ -43,7 +43,7 @@ Open your TrueNAS Host Shell (**System Settings** > **Shell**) or an active SSH 
    ```
 2. Clone the official Anova device command line library:
    ```bash
-   git clone https://github.com developer-project-wifi
+   git clone https://github.com/anova-culinary/developer-project-wifi
    ```
 3. Move into the newly created folder asset layout:
    ```bash
