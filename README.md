@@ -1,3 +1,8 @@
+[![GitHub release](https://shields.io)](https://github.com)
+[![License: MIT](https://shields.io)](https://opensource.org)
+[![Platform](https://shields.io)](https://truenas.com)
+[![Home Assistant](https://shields.io)](https://home-assistant.io)
+
 # Anova Wi-Fi to MQTT Home Assistant Bridge
 
 An ultra-lightweight, high-efficiency middleware proxy engine to bridge the official Anova Wi-Fi Developer CLI tool with Home Assistant over MQTT. Designed specifically for TrueNAS SCALE and Alpine Linux containers.
