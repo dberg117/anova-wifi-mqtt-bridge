@@ -9,17 +9,99 @@ An ultra-lightweight, high-efficiency middleware proxy engine to bridge the offi
 - **Networkless Reboots**: Persistent localized dependency caching hooks.
 - **Decoupled Power Staging**: Changes targets safely while the cooker remains off.
 
-## 🛠️ TrueNAS SCALE App Configuration
-1. Deploy a **Custom App** container utilizing image layout tag: `python:3.11-alpine`.
-2. Mount a **Host Path Volume** mapping this repository to directory: `/app`.
-3. Configure the **Container Entrypoint** options:
-   - Command: `/bin/sh`
-   - Argument: `/app/start.sh`
-4. Set these secure **Environment Variables**:
-   - `MQTT_BROKER`: Your Home Assistant server IP address.
-   - `MQTT_USER`: Your MQTT broker configuration profile user.
-   - `MQTT_PASS`: Your MQTT broker connection profile password.
-   - `ANOVA_TOKEN`: Your Personal Access Token generated via the phone app.
+---
+
+## 🔑 Obtaining Your Anova Developer Token
+
+The official Anova cloud API requires a developer token to authorize your container. Even if you only own an Anova Sous Vide cooker, you must use the Oven app interface to generate this string.
+
+1. Download and log into the **Anova Precision Oven App** on your iOS or Android smartphone.
+2. Navigate to the **More** tab in the bottom-right corner of the app layout.
+3. Tap on **Developer** options.
+4. Select **Personal Access Tokens**.
+5. Click **Create Token** (or *Generate*), copy the long alphanumerical string payload, and save it safely. 
+   - *Note: Your token string will always begin with the `anova-` prefix.*
+
+---
+
+## 🛠️ TrueNAS SCALE Deployment Guide
+
+Follow these step-by-step instructions to configure and deploy this container cleanly on TrueNAS SCALE.
+
+### 📋 Prerequisites
+1. Set up a secure dataset folder directory on your storage pool.
+   - *Example Path Base*: `/mnt/YOUR_POOL/anova-wifi`
+2. Obtain your **Anova Developer Token** using the Oven app steps above.
+3. Obtain your Home Assistant **MQTT Broker IP** and login credentials.
+
+### 📂 Step 1: Clone the Core CLI Repository
+Open your TrueNAS Host Shell (**System Settings** > **Shell**) or an active SSH terminal session to clone the underlying framework.
+
+1. Move into your target storage network directory:
+   ```bash
+   cd /mnt/YOUR_POOL/anova-wifi
+   ```
+2. Clone the official Anova device command line library:
+   ```bash
+   git clone https://github.com developer-project-wifi
+   ```
+3. Move into the newly created folder asset layout:
+   ```bash
+   cd developer-project-wifi
+   ```
+4. Move your custom `start.sh` and `mqtt_bridge.py` files directly into this directory folder alongside the cloned script files.
+
+### 📦 Step 2: Initialize the Application
+1. Navigate to the **Apps** page on your TrueNAS SCALE sidebar.
+2. Click **Discover Apps** in the top right corner.
+3. Click **Custom App** to open the configuration wizard.
+4. Set the **Application Name** to: `anova-wifi-cli`.
+
+### 💾 Step 3: Container Image Configuration
+1. Locate the **Container Image** section.
+2. Set the **Image Repository** to: `python`.
+3. Set the **Image Tag** to: `3.11-alpine`.
+
+### ⚙️ Step 4: Entrypoint & Command Configuration
+1. Scroll down to the **Container Entrypoint** section.
+2. Leave the **Entrypoint** field completely blank or empty.
+3. Under **Command**, add exactly one item entry:
+   - `/app/start.sh`
+
+### 🔑 Step 5: Environment Variables (Secrets Setup)
+1. Locate the **Environment Variables** subsection.
+2. Click **Add** to map your configuration tokens sequentially:
+   - **Key**: `MQTT_BROKER` | **Value**: `Your_Home_Assistant_IP`
+   - **Key**: `MQTT_USER` | **Value**: `Your_MQTT_Username`
+   - **Key**: `MQTT_PASS` | **Value**: `Your_MQTT_Password`
+   - **Key**: `ANOVA_TOKEN` | **Value**: `Your_Anova_Personal_Access_Token`
+
+### 🌐 Step 6: Network Configuration
+1. Scroll down to the **Network Configuration** menu.
+2. Check the box for **Host Network** to bypass internal Docker bridges. 
+   - *Note: This is mandatory to route network packets to local Home Assistant IPs.*
+
+### 📂 Step 7: Host Path Storage Volumes
+1. Scroll down to the **Storage Settings** section.
+2. Under **Host Path Volumes**, click **Add** to configure persistent file mappings:
+   - **Host Path**: `/mnt/YOUR_POOL/anova-wifi/developer-project-wifi`
+   - **Mount Path**: `/app`
+
+### 🎛️ Step 8: System Resource Allocation Limits (Optional)
+*Note: Setting container resource limits is entirely optional but recommended to maintain a minimal runtime environment.*
+
+1. Locate the **Resources / Limits** options block.
+2. Check the box to enable **CPU and Memory Limits**.
+3. Set the **CPU Limit** to exactly: `1` *(This restricts the container to a maximum of 1 whole CPU core)*.
+4. Set the **Memory Limit** to exactly: `64MB`. *(This should be a safe amount as I've only seen about 32mb typically)*.
+
+### 🚀 Step 9: Save and Launch
+1. Scroll to the bottom of the installation wizard.
+2. Click the blue **Save** button.
+3. Wait for the app card status to read **Running**.
+4. Open the app **Logs** panel to confirm the bridge establishes cleanly.
+
+---
 
 ## 🏡 Home Assistant Sensors Mapping Layout
 Append this comprehensive tracker mapping framework configuration block directly to your `configuration.yaml` file:
