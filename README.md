@@ -1,5 +1,5 @@
 [![GitHub release](https://shields.io)](https://github.com)
-[![License: MIT](https://shields.io)](https://opensource.org)
+[![License: MIT](https://shields.io)](https://github.com)
 [![Platform](https://shields.io)](https://truenas.com)
 [![Home Assistant](https://shields.io)](https://home-assistant.io)
 
