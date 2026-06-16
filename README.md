@@ -226,6 +226,8 @@ mode: restart
 ## 🏡 Home Assistant Dashboard
 This is the card I built in Lovelace to track my food cooking:
 
+<img width="504" height="342" alt="Anova HA" src="https://github.com/user-attachments/assets/c10b8d1a-fdd6-407a-941a-08bb5e82bbc6" />
+
 ```yaml
 type: conditional
 conditions:
