@@ -150,10 +150,17 @@ def send_inline_command(inputs):
         except Exception: pass
 
 def on_connect(client, userdata, flags, reason_code, properties=None):
-    try:
-        client._sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-    except Exception: pass
-    client.subscribe("anova/cooker/set", qos=0)
+    if reason_code == 0:
+        print("=== Successfully connected to MQTT Broker ===", flush=True)
+        try:
+            client._sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        except Exception: pass
+        client.subscribe("anova/cooker/set", qos=0)
+    else:
+        print(f"!!! MQTT Connection Failed with Reason Code: {reason_code} !!!", flush=True)
+
+def on_disconnect(client, userdata, flags, reason_code, properties=None):
+    print(f"!!! Disconnected from MQTT Broker (Reason: {reason_code}). Reconnecting... !!!", flush=True)
 
 def on_message(client, userdata, msg):
     global is_cooking, current_target_temp
@@ -179,19 +186,25 @@ def on_message(client, userdata, msg):
 
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 client.on_connect = on_connect
+client.on_disconnect = on_disconnect
 client.on_message = on_message
 
-if USER and PASS: client.username_pw_set(USER, PASS)
+if USER and PASS: 
+    client.username_pw_set(USER, PASS)
 
 while True:
     try:
+        print(f"Connecting to MQTT Broker at {BROKER}:{PORT}...", flush=True)
         client.connect(BROKER, PORT, 60)
-        client.loop_start() 
         break
-    except Exception:
+    except Exception as e:
+        print(f"MQTT connection failed ({e}). Retrying in 5 seconds...", flush=True)
         time.sleep(5)
 
 run_anova_stream()
 threading.Thread(target=watchdog_loop, daemon=True).start()
 
-threading.Event().wait()
+try:
+    client.loop_forever()
+except KeyboardInterrupt:
+    print("Shutting down gracefully...", flush=True)
