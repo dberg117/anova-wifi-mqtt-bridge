@@ -103,7 +103,7 @@ def run_anova_stream():
                 pass
             
         proc = subprocess.Popen(
-            ["python", "-O", "/app/anova_interactive.py"], 
+            ["python", "-O", "anova_interactive.py"], 
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             text=True, bufsize=1, close_fds=True 
         )
@@ -166,6 +166,45 @@ def on_connect(client, userdata, flags, reason_code, properties=None):
             client._sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         except Exception: 
             pass
+        
+        device_info = {
+            "identifiers": ["anova_sous_vide_cooker"],
+            "name": "Anova Sous Vide",
+            "manufacturer": "Anova",
+            "model": "Precision Cooker"
+        }
+
+        current_temp_config = {
+            "name": "Anova Current Temperature",
+            "unique_id": "anova_current_temperature",
+            "state_topic": "anova/cooker/state",
+            "value_template": "{{ value_json.currentTemperature }}",
+            "device_class": "temperature",
+            "unit_of_measurement": "°C",
+            "device": device_info
+        }
+        client.publish("homeassistant/sensor/anova_cooker/current_temp/config", json.dumps(current_temp_config), qos=1, retain=True)
+
+        target_temp_config = {
+            "name": "Anova Target Temperature",
+            "unique_id": "anova_target_temperature",
+            "state_topic": "anova/cooker/state",
+            "value_template": "{{ value_json.targetTemperature }}",
+            "device_class": "temperature",
+            "unit_of_measurement": "°C",
+            "device": device_info
+        }
+        client.publish("homeassistant/sensor/anova_cooker/target_temp/config", json.dumps(target_temp_config), qos=1, retain=True)
+
+        cooking_config = {
+            "name": "Anova Is Cooking",
+            "unique_id": "anova_is_cooking",
+            "state_topic": "anova/cooker/state",
+            "value_template": "{{ 'ON' if value_json.isCooking else 'OFF' }}",
+            "device": device_info
+        }
+        client.publish("homeassistant/binary_sensor/anova_cooker/is_cooking/config", json.dumps(cooking_config), qos=1, retain=True)
+
         client.subscribe("anova/cooker/set", qos=0)
     else:
         print(f"!!! MQTT Connection Failed with Reason Code: {reason_code} !!!", flush=True)
