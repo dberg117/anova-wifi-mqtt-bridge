@@ -27,6 +27,7 @@ state_lock = threading.Lock()
 
 is_cooking = False
 current_target_temp = 55.0
+current_timer = 0
 
 essential_keys = {
     "currentTemperature", "targetTemperature", "timerInSeconds", 
@@ -273,24 +274,47 @@ def on_disconnect(client, userdata, flags, reason_code, properties=None):
     print(f"Disconnected from MQTT broker with reason code: {reason_code}", flush=True)
 
 def on_message(client, userdata, msg):
-    global is_cooking, current_target_temp
+    global is_cooking, current_target_temp, current_timer
     payload = msg.payload.decode("utf-8").strip()
     
     with state_lock:
         local_cooking = is_cooking
         local_target = current_target_temp
+        local_timer = current_timer
 
     def process_command():
-        global current_target_temp
+        global current_target_temp, current_timer
+        
+        # 1. Handle JSON Payloads
+        if payload.startswith("{"):
+            try:
+                data = json.loads(payload)
+                temp = float(data.get("temp", local_target))
+                timer = int(data.get("timer", local_timer))
+                cmd = data.get("command", "").lower()
+                
+                with state_lock:
+                    current_target_temp = temp
+                    current_timer = timer
+                    
+                if cmd == "start":
+                    send_inline_command(["2", str(temp), str(timer)])
+                elif cmd == "stop":
+                    send_inline_command(["3"])
+                return
+            except Exception as e:
+                print(f"JSON command error: {e}", flush=True)
+
+        # 2. Legacy Plain-Text Fallback (for existing buttons)
         if payload.lower() == "stop":
             send_inline_command(["3"]) 
         elif payload.lower() == "start":
-            send_inline_command(["2", str(local_target), "0"]) 
+            send_inline_command(["2", str(local_target), str(local_timer)]) 
         else:
             try:
                 temp = float(payload)
                 if local_cooking:
-                    send_inline_command(["2", str(temp), "0"])
+                    send_inline_command(["2", str(temp), str(local_timer)])
                 else:
                     with state_lock:
                         current_target_temp = temp
