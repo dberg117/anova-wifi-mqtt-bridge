@@ -169,92 +169,92 @@ def on_connect(client, userdata, flags, reason_code, properties=None):
         
         device_info = {
             "identifiers": ["anova_sous_vide_cooker"],
-            "name": "Anova Sous Vide",
+            "name": "Anova",
             "manufacturer": "Anova",
             "model": "Precision Cooker"
         }
 
         configs = [
             ("sensor", "current_temp", {
-                "name": "Anova Current Temperature", "unique_id": "anova_current_temperature",
+                "name": "Current Temperature", "unique_id": "anova_current_temperature",
                 "state_topic": "anova/cooker/state", "value_template": "{{ value_json.currentTemperature }}",
                 "device_class": "temperature", "unit_of_measurement": "°C", "device": device_info
             }),
             ("sensor", "target_temp", {
-                "name": "Anova Target Temperature", "unique_id": "anova_target_temperature",
+                "name": "Target Temperature", "unique_id": "anova_target_temperature",
                 "state_topic": "anova/cooker/state", "value_template": "{{ value_json.targetTemperature }}",
                 "device_class": "temperature", "unit_of_measurement": "°C", "device": device_info
             }),
             ("sensor", "timer_remaining", {
-                "name": "Anova Timer Remaining", "unique_id": "anova_timer_remaining",
+                "name": "Timer Remaining", "unique_id": "anova_timer_remaining",
                 "state_topic": "anova/cooker/state", "value_template": "{{ value_json.timerInSeconds }}",
                 "device_class": "duration", "unit_of_measurement": "s", "device": device_info
             }),
             ("sensor", "firmware", {
-                "name": "Anova Firmware Version", "unique_id": "anova_firmware",
+                "name": "Firmware Version", "unique_id": "anova_firmware",
                 "state_topic": "anova/cooker/state", "value_template": "{{ value_json.firmwareVersion }}",
-                "device": device_info
+                "entity_category": "diagnostic", "device": device_info
             }),
             ("sensor", "unit", {
-                "name": "Anova Temperature Unit", "unique_id": "anova_unit",
+                "name": "Temperature Unit", "unique_id": "anova_unit",
                 "state_topic": "anova/cooker/state", "value_template": "{{ value_json.unit | upper }}",
-                "device": device_info
+                "entity_category": "diagnostic", "device": device_info
             }),
             ("sensor", "job_type", {
-                "name": "Anova Job Type", "unique_id": "anova_job_type",
+                "name": "Job Type", "unique_id": "anova_job_type",
                 "state_topic": "anova/cooker/state", 
                 "value_template": "{{ value_json.currentJob.jobType if value_json.currentJob is defined else 'None' }}",
-                "device": device_info
+                "entity_category": "diagnostic", "device": device_info
             }),
             ("sensor", "job_stage", {
-                "name": "Anova Job Stage", "unique_id": "anova_job_stage",
+                "name": "Job Stage", "unique_id": "anova_job_stage",
                 "state_topic": "anova/cooker/state", 
                 "value_template": "{{ value_json.currentJob.jobStage if value_json.currentJob is defined else 'None' }}",
                 "device": device_info
             }),
             ("binary_sensor", "is_cooking", {
-                "name": "Anova Cooking Status", "unique_id": "anova_is_cooking",
+                "name": "Cooking Status", "unique_id": "anova_is_cooking",
                 "state_topic": "anova/cooker/state", "value_template": "{{ 'ON' if value_json.isCooking else 'OFF' }}",
                 "device_class": "running", "device": device_info
             }),
             ("binary_sensor", "connection", {
-                "name": "Anova Connection Status", "unique_id": "anova_connection",
+                "name": "Connection Status", "unique_id": "anova_connection",
                 "state_topic": "anova/cooker/state", "value_template": "{{ 'ON' if value_json.isConnected else 'OFF' }}",
-                "device_class": "connectivity", "device": device_info
+                "device_class": "connectivity", "entity_category": "diagnostic", "device": device_info
             }),
             ("binary_sensor", "alarm", {
-                "name": "Anova Alarm Active", "unique_id": "anova_alarm",
+                "name": "Alarm Active", "unique_id": "anova_alarm",
                 "state_topic": "anova/cooker/state", "value_template": "{{ 'ON' if value_json.isAlarmActive else 'OFF' }}",
-                "device_class": "problem", "device": device_info
+                "device_class": "problem", "entity_category": "diagnostic", "device": device_info
             }),
             ("binary_sensor", "timer_running", {
-                "name": "Anova Timer Running", "unique_id": "anova_timer_running",
+                "name": "Timer Running", "unique_id": "anova_timer_running",
                 "state_topic": "anova/cooker/state", "value_template": "{{ 'ON' if value_json.isTimerRunning else 'OFF' }}",
                 "device_class": "timer", "device": device_info
             }),
             ("binary_sensor", "speaker", {
-                "name": "Anova Speaker Status", "unique_id": "anova_speaker",
+                "name": "Speaker Status", "unique_id": "anova_speaker",
                 "state_topic": "anova/cooker/state", "value_template": "{{ 'ON' if value_json.isSpeakerOn else 'OFF' }}",
-                "device": device_info
+                "entity_category": "diagnostic", "device": device_info
             }),
             ("binary_sensor", "keeping_warm", {
-                "name": "Anova Keeping Warm", "unique_id": "anova_keeping_warm",
+                "name": "Keeping Warm", "unique_id": "anova_keeping_warm",
                 "state_topic": "anova/cooker/state", "value_template": "{{ 'ON' if value_json.isKeepingWarm else 'OFF' }}",
                 "device_class": "running", "device": device_info
             }),
             ("binary_sensor", "ice_bath", {
-                "name": "Anova Ice Bath Monitoring", "unique_id": "anova_ice_bath",
+                "name": "Ice Bath Monitoring", "unique_id": "anova_ice_bath",
                 "state_topic": "anova/cooker/state", "value_template": "{{ 'ON' if value_json.isMonitoringIcebath else 'OFF' }}",
                 "device": device_info
             }),
             ("switch", "control", {
-                "name": "Anova Cooker Control", "unique_id": "anova_cooker_control",
+                "name": "Control", "unique_id": "anova_cooker_control",
                 "state_topic": "anova/cooker/state", "value_template": "{{ 'ON' if value_json.isCooking else 'OFF' }}",
                 "command_topic": "anova/cooker/set", "payload_on": "start", "payload_off": "stop",
                 "state_on": "ON", "state_off": "OFF", "device": device_info
             }),
             ("number", "target_temp_number", {
-                "name": "Anova Temperature Target", "unique_id": "anova_temperature_target",
+                "name": "Target Temperature", "unique_id": "anova_temperature_target",
                 "state_topic": "anova/cooker/state", "value_template": "{{ value_json.targetTemperature }}",
                 "command_topic": "anova/cooker/set", "min": 20, "max": 95, "step": 0.1,
                 "unit_of_measurement": "°C", "device": device_info
