@@ -22,7 +22,7 @@ except KeyError as e:
     sys.exit(1)
 
 proc = None
-lock = threading.Lock()
+lock = threading.RLock()
 state_lock = threading.Lock()
 
 is_cooking = False
@@ -45,7 +45,12 @@ def read_output(process):
             try:
                 start = line.find("{")
                 end = line.rfind("}") + 1
-                payload = ast.literal_eval(line[start:end])
+                raw_payload = line[start:end]
+                
+                try:
+                    payload = json.loads(raw_payload)
+                except json.JSONDecodeError:
+                    payload = ast.literal_eval(raw_payload)
                 
                 with state_lock:
                     is_cooking = payload.get("isCooking", False)
@@ -84,14 +89,18 @@ def read_output(process):
                         client.publish("anova/cooker/state", json.dumps(pruned_payload), qos=0)
                         last_published_state = payload
                         last_send_time = current_time
-            except Exception: pass
+            except Exception as e:
+                print(f"Payload parsing error: {e}", flush=True)
 
 def run_anova_stream():
     global proc
     with lock:
         if proc:
-            try: proc.terminate(); proc.wait()
-            except: pass
+            try: 
+                proc.terminate()
+                proc.wait(timeout=2)
+            except: 
+                pass
             
         proc = subprocess.Popen(
             ["python", "-O", "/app/anova_interactive.py"], 
@@ -147,14 +156,16 @@ def send_inline_command(inputs):
             
             proc.stdin.write("1\n")
             proc.stdin.flush()
-        except Exception: pass
+        except Exception: 
+            pass
 
 def on_connect(client, userdata, flags, reason_code, properties=None):
     if reason_code == 0:
         print("=== Successfully connected to MQTT Broker ===", flush=True)
         try:
             client._sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        except Exception: pass
+        except Exception: 
+            pass
         client.subscribe("anova/cooker/set", qos=0)
     else:
         print(f"!!! MQTT Connection Failed with Reason Code: {reason_code} !!!", flush=True)
@@ -170,19 +181,24 @@ def on_message(client, userdata, msg):
         local_cooking = is_cooking
         local_target = current_target_temp
 
-    if payload.lower() == "stop":
-        send_inline_command(["3"]) 
-    elif payload.lower() == "start":
-        send_inline_command(["2", str(local_target), "0"]) 
-    else:
-        try:
-            temp = float(payload)
-            if local_cooking:
-                send_inline_command(["2", str(temp), "0"])
-            else:
-                with state_lock:
-                    current_target_temp = temp
-        except ValueError: pass
+    def process_command():
+        global current_target_temp
+        if payload.lower() == "stop":
+            send_inline_command(["3"]) 
+        elif payload.lower() == "start":
+            send_inline_command(["2", str(local_target), "0"]) 
+        else:
+            try:
+                temp = float(payload)
+                if local_cooking:
+                    send_inline_command(["2", str(temp), "0"])
+                else:
+                    with state_lock:
+                        current_target_temp = temp
+            except ValueError: 
+                pass
+
+    threading.Thread(target=process_command, daemon=True).start()
 
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 client.on_connect = on_connect
