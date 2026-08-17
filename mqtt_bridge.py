@@ -69,12 +69,10 @@ current_state: dict[str, Any] = {}
 last_published: dict[str, Any] = {}
 last_send_time = 0.0
 
-# Selected device
 selected_cooker_id: str | None = None
 selected_device_type: str | None = None
 selected_name: str = "Anova"
 
-# Command queue: MQTT thread → asyncio loop
 command_queue: asyncio.Queue | None = None
 main_loop: asyncio.AbstractEventLoop | None = None
 
@@ -117,11 +115,12 @@ def on_mqtt_message(client: mqtt.Client, userdata: Any, msg: mqtt.MQTTMessage) -
 
 
 def publish_discovery(client: mqtt.Client) -> None:
+    """Publish Home Assistant MQTT discovery configs (best-practice layout)."""
     device_info = {
         "identifiers": ["anova_sous_vide_cooker"],
         "name": selected_name or "Anova",
         "manufacturer": "Anova",
-        "model": "Precision Cooker",
+        "model": "Precision Cooker A3",
         "sw_version": "mqtt-bridge-ws",
     }
     avail = {
@@ -131,23 +130,68 @@ def publish_discovery(client: mqtt.Client) -> None:
     }
 
     configs: list[tuple[str, str, dict]] = [
-        ("sensor", "current_temp", {
+        # ── Controls ──────────────────────────────────────────────
+        ("switch", "control", {
+            "name": "Control",
+            "unique_id": "anova_control",
+            "state_topic": STATE_TOPIC,
+            "value_template": "{{ 'ON' if value_json.isCooking else 'OFF' }}",
+            "command_topic": SET_TOPIC,
+            "payload_on": "start",
+            "payload_off": "stop",
+            "state_on": "ON",
+            "state_off": "OFF",
+            "icon": "mdi:pot-steam",
+            **avail,
+            "device": device_info,
+        }),
+        ("number", "target_temperature", {
+            "name": "Target Temperature",
+            "unique_id": "anova_target_temperature",
+            "state_topic": STATE_TOPIC,
+            "value_template": "{{ value_json.targetTemperature }}",
+            "command_topic": SET_TOPIC,
+            "command_template": "{{ value }}",
+            "min": 20,
+            "max": 95,
+            "step": 0.1,
+            "unit_of_measurement": "°C",
+            "device_class": "temperature",
+            "mode": "slider",
+            **avail,
+            "device": device_info,
+        }),
+        ("number", "timer", {
+            "name": "Timer",
+            "unique_id": "anova_timer",
+            "state_topic": STATE_TOPIC,
+            "value_template": "{{ ((value_json.timerInSeconds | int) / 60) | round(0) }}",
+            "command_topic": SET_TOPIC,
+            "command_template": (
+                '{"command": "start", "temp": {{ states("number.anova_target_temperature") }}, '
+                '"timer": {{ (value | int) * 60 }}}'
+            ),
+            "min": 0,
+            "max": 1440,
+            "step": 1,
+            "unit_of_measurement": "min",
+            "mode": "box",
+            "icon": "mdi:timer-outline",
+            **avail,
+            "device": device_info,
+        }),
+
+        # ── Main sensors ──────────────────────────────────────────
+        ("sensor", "current_temperature", {
             "name": "Current Temperature",
             "unique_id": "anova_current_temperature",
             "state_topic": STATE_TOPIC,
             "value_template": "{{ value_json.currentTemperature }}",
             "device_class": "temperature",
+            "state_class": "measurement",
             "unit_of_measurement": "°C",
-            **avail, "device": device_info,
-        }),
-        ("sensor", "target_temp", {
-            "name": "Target Temperature",
-            "unique_id": "anova_target_temperature",
-            "state_topic": STATE_TOPIC,
-            "value_template": "{{ value_json.targetTemperature }}",
-            "device_class": "temperature",
-            "unit_of_measurement": "°C",
-            **avail, "device": device_info,
+            **avail,
+            "device": device_info,
         }),
         ("sensor", "timer_remaining", {
             "name": "Timer Remaining",
@@ -156,55 +200,75 @@ def publish_discovery(client: mqtt.Client) -> None:
             "value_template": "{{ value_json.timerInSeconds }}",
             "device_class": "duration",
             "unit_of_measurement": "s",
-            **avail, "device": device_info,
-        }),
-        ("sensor", "firmware", {
-            "name": "Firmware Version",
-            "unique_id": "anova_firmware",
-            "state_topic": STATE_TOPIC,
-            "value_template": "{{ value_json.firmwareVersion }}",
-            "entity_category": "diagnostic",
-            **avail, "device": device_info,
-        }),
-        ("sensor", "unit", {
-            "name": "Temperature Unit",
-            "unique_id": "anova_unit",
-            "state_topic": STATE_TOPIC,
-            "value_template": "{{ value_json.unit | upper }}",
-            "entity_category": "diagnostic",
-            **avail, "device": device_info,
-        }),
-        ("sensor", "job_type", {
-            "name": "Job Type",
-            "unique_id": "anova_job_type",
-            "state_topic": STATE_TOPIC,
-            "value_template": "{{ value_json.currentJob.jobType if value_json.currentJob is defined else 'None' }}",
-            "entity_category": "diagnostic",
-            **avail, "device": device_info,
+            "icon": "mdi:timer-outline",
+            **avail,
+            "device": device_info,
         }),
         ("sensor", "job_stage", {
             "name": "Job Stage",
             "unique_id": "anova_job_stage",
             "state_topic": STATE_TOPIC,
             "value_template": "{{ value_json.currentJob.jobStage if value_json.currentJob is defined else 'None' }}",
-            **avail, "device": device_info,
+            "icon": "mdi:progress-clock",
+            **avail,
+            "device": device_info,
         }),
-        ("binary_sensor", "is_cooking", {
-            "name": "Cooking Status",
-            "unique_id": "anova_is_cooking",
+        ("sensor", "job_type", {
+            "name": "Job Type",
+            "unique_id": "anova_job_type",
+            "state_topic": STATE_TOPIC,
+            "value_template": "{{ value_json.currentJob.jobType if value_json.currentJob is defined else 'None' }}",
+            **avail,
+            "device": device_info,
+        }),
+
+        # ── Status binary sensors ─────────────────────────────────
+        ("binary_sensor", "cooking", {
+            "name": "Cooking",
+            "unique_id": "anova_cooking",
             "state_topic": STATE_TOPIC,
             "value_template": "{{ 'ON' if value_json.isCooking else 'OFF' }}",
             "device_class": "running",
-            **avail, "device": device_info,
+            **avail,
+            "device": device_info,
         }),
+        ("binary_sensor", "timer_running", {
+            "name": "Timer Running",
+            "unique_id": "anova_timer_running",
+            "state_topic": STATE_TOPIC,
+            "value_template": "{{ 'ON' if value_json.isTimerRunning else 'OFF' }}",
+            "device_class": "running",
+            **avail,
+            "device": device_info,
+        }),
+        ("binary_sensor", "keeping_warm", {
+            "name": "Keeping Warm",
+            "unique_id": "anova_keeping_warm",
+            "state_topic": STATE_TOPIC,
+            "value_template": "{{ 'ON' if value_json.isKeepingWarm else 'OFF' }}",
+            "device_class": "running",
+            **avail,
+            "device": device_info,
+        }),
+        ("binary_sensor", "ice_bath", {
+            "name": "Ice Bath Monitoring",
+            "unique_id": "anova_ice_bath",
+            "state_topic": STATE_TOPIC,
+            "value_template": "{{ 'ON' if value_json.isMonitoringIcebath else 'OFF' }}",
+            **avail,
+            "device": device_info,
+        }),
+
+        # ── Diagnostics ───────────────────────────────────────────
         ("binary_sensor", "connection", {
-            "name": "Connection Status",
+            "name": "Connection",
             "unique_id": "anova_connection",
             "state_topic": STATE_TOPIC,
             "value_template": "{{ 'ON' if value_json.isConnected else 'OFF' }}",
             "device_class": "connectivity",
             "entity_category": "diagnostic",
-            **avail, "device": device_info,
+            **avail,
+            "device": device_info,
         }),
         ("binary_sensor", "alarm", {
             "name": "Alarm Active",
@@ -213,62 +277,35 @@ def publish_discovery(client: mqtt.Client) -> None:
             "value_template": "{{ 'ON' if value_json.isAlarmActive else 'OFF' }}",
             "device_class": "problem",
             "entity_category": "diagnostic",
-            **avail, "device": device_info,
-        }),
-        ("binary_sensor", "timer_running", {
-            "name": "Timer Running",
-            "unique_id": "anova_timer_running",
-            "state_topic": STATE_TOPIC,
-            "value_template": "{{ 'ON' if value_json.isTimerRunning else 'OFF' }}",
-            "device_class": "running",
-            **avail, "device": device_info,
+            **avail,
+            "device": device_info,
         }),
         ("binary_sensor", "speaker", {
-            "name": "Speaker Status",
+            "name": "Speaker",
             "unique_id": "anova_speaker",
             "state_topic": STATE_TOPIC,
             "value_template": "{{ 'ON' if value_json.isSpeakerOn else 'OFF' }}",
             "entity_category": "diagnostic",
-            **avail, "device": device_info,
+            **avail,
+            "device": device_info,
         }),
-        ("binary_sensor", "keeping_warm", {
-            "name": "Keeping Warm",
-            "unique_id": "anova_keeping_warm",
+        ("sensor", "firmware", {
+            "name": "Firmware",
+            "unique_id": "anova_firmware",
             "state_topic": STATE_TOPIC,
-            "value_template": "{{ 'ON' if value_json.isKeepingWarm else 'OFF' }}",
-            "device_class": "running",
-            **avail, "device": device_info,
+            "value_template": "{{ value_json.firmwareVersion }}",
+            "entity_category": "diagnostic",
+            **avail,
+            "device": device_info,
         }),
-        ("binary_sensor", "ice_bath", {
-            "name": "Ice Bath Monitoring",
-            "unique_id": "anova_ice_bath",
+        ("sensor", "unit", {
+            "name": "Temperature Unit",
+            "unique_id": "anova_unit",
             "state_topic": STATE_TOPIC,
-            "value_template": "{{ 'ON' if value_json.isMonitoringIcebath else 'OFF' }}",
-            **avail, "device": device_info,
-        }),
-        ("switch", "control", {
-            "name": "Control",
-            "unique_id": "anova_cooker_control",
-            "state_topic": STATE_TOPIC,
-            "value_template": "{{ 'ON' if value_json.isCooking else 'OFF' }}",
-            "command_topic": SET_TOPIC,
-            "payload_on": "start",
-            "payload_off": "stop",
-            "state_on": "ON",
-            "state_off": "OFF",
-            **avail, "device": device_info,
-        }),
-        ("number", "target_temp_number", {
-            "name": "Target Temperature",
-            "unique_id": "anova_temperature_target",
-            "state_topic": STATE_TOPIC,
-            "value_template": "{{ value_json.targetTemperature }}",
-            "command_topic": SET_TOPIC,
-            "min": 20,
-            "max": 95,
-            "step": 0.1,
-            "unit_of_measurement": "°C",
-            **avail, "device": device_info,
+            "value_template": "{{ value_json.unit | upper }}",
+            "entity_category": "diagnostic",
+            **avail,
+            "device": device_info,
         }),
     ]
 
@@ -278,7 +315,6 @@ def publish_discovery(client: mqtt.Client) -> None:
 
 
 def publish_state(force: bool = False) -> None:
-    """Publish current_state to MQTT if it changed meaningfully."""
     global last_published, last_send_time
 
     with state_lock:
@@ -343,22 +379,15 @@ if USER and PASS:
     mqtt_client.username_pw_set(USER, PASS)
 
 # ---------------------------------------------------------------------------
-# State normalisation (WebSocket → flat dict used by HA)
+# State normalisation
 # ---------------------------------------------------------------------------
 
 def normalize_state(raw: dict[str, Any]) -> dict[str, Any]:
-    """
-    Turn the various Anova state payload shapes into the flat dict the
-    previous CLI bridge published (so existing HA discovery keeps working).
-    """
-    out: dict[str, Any] = {
-        "isConnected": True,  # if we received a state message, we are connected
-    }
+    out: dict[str, Any] = {"isConnected": True}
 
     state = raw.get("state") or raw
     job = state.get("job") or state.get("currentJob") or {}
 
-    # Temperature
     for key in ("currentTemperature", "current_temp", "waterTemperature"):
         if key in state:
             out["currentTemperature"] = float(state[key])
@@ -376,7 +405,6 @@ def normalize_state(raw: dict[str, Any]) -> dict[str, Any]:
                 out["targetTemperature"] = float(job[key])
                 break
 
-    # Timer
     for key in ("timerInSeconds", "timer", "remainingTime"):
         if key in state:
             out["timerInSeconds"] = int(state[key] or 0)
@@ -386,7 +414,6 @@ def normalize_state(raw: dict[str, Any]) -> dict[str, Any]:
         if t is not None:
             out["timerInSeconds"] = int(t)
 
-    # Booleans / status
     mode = str(state.get("mode") or state.get("status") or "").lower()
     out["isCooking"] = bool(
         state.get("isCooking")
@@ -399,12 +426,10 @@ def normalize_state(raw: dict[str, Any]) -> dict[str, Any]:
     out["isKeepingWarm"] = bool(state.get("isKeepingWarm") or mode == "keep warm")
     out["isMonitoringIcebath"] = bool(state.get("isMonitoringIcebath"))
 
-    # Unit & firmware
     unit = state.get("unit") or state.get("temperatureUnit") or "C"
     out["unit"] = str(unit).upper()[:1]
     out["firmwareVersion"] = state.get("firmwareVersion") or state.get("firmware") or ""
 
-    # Job info
     if isinstance(job, dict) and job:
         out["currentJob"] = {
             "jobType": job.get("jobType") or job.get("type") or "cook",
@@ -433,7 +458,6 @@ async def send_ws_command(ws: Any, command: str, payload: dict) -> None:
 
 
 async def handle_mqtt_command(ws: Any, raw: str) -> None:
-    """Translate an MQTT payload into a WebSocket command."""
     global current_state
 
     if selected_cooker_id is None or selected_device_type is None:
@@ -445,7 +469,6 @@ async def handle_mqtt_command(ws: Any, raw: str) -> None:
         local_timer = current_state.get("timerInSeconds", 0)
         local_cooking = current_state.get("isCooking", False)
 
-    # JSON form: {"command":"start"|"stop", "temp":56.5, "timer":3600}
     if raw.startswith("{"):
         try:
             data = json.loads(raw)
@@ -486,7 +509,6 @@ async def handle_mqtt_command(ws: Any, raw: str) -> None:
             "timer": local_timer,
         })
     else:
-        # Plain number → set target temperature
         try:
             temp = float(raw)
             if local_cooking:
@@ -507,12 +529,10 @@ async def handle_mqtt_command(ws: Any, raw: str) -> None:
 
 
 async def process_ws_message(data: dict[str, Any]) -> None:
-    """Handle one inbound WebSocket message."""
     global selected_cooker_id, selected_device_type, selected_name, current_state
 
     command = data.get("command", "")
 
-    # Device list
     if command in ("EVENT_APC_WIFI_LIST", "EVENT_APO_WIFI_LIST"):
         devices = data.get("payload") or []
         if not devices:
@@ -530,7 +550,6 @@ async def process_ws_message(data: dict[str, Any]) -> None:
         )
         return
 
-    # State updates
     if command in (
         "EVENT_APC_STATE",
         "EVENT_APC_WIFI_STATE",
